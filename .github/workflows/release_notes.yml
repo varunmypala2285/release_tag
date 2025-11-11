@@ -1,0 +1,205 @@
+name: Auto Tag and Release (Production)
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - prod_test
+
+permissions:
+  contents: write
+
+jobs:
+  create_release:
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.title, 'Sprint Release:')
+    runs-on: ubuntu-latest
+
+    env:
+      REPO: ${{ github.repository }}
+      GITHUB_API: https://api.github.com
+      TARGET_BRANCH: "test/PROD"
+
+    steps:
+      - name: Initialize repository and fetch all tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.VARUN_TOKEN }}
+        run: |
+          echo "Initializing repository..."
+          git init
+          git remote add origin https://${{ secrets.VARUN2_TOKEN }}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git
+          git fetch origin --tags --prune
+          git fetch origin +refs/heads/*:refs/remotes/origin/*
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "Repository initialized successfully."
+      - name: Determine next sprint tag
+        id: next_tag
+        run: |
+          echo "Determining next sprint tag..."
+          LATEST_TAG=$(git tag --list 'sprint_*' | sort -V | tail -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            NEXT_TAG="sprint_1"
+          else
+            NUM=$(echo "$LATEST_TAG" | grep -oE '[0-9]+$' || echo 0)
+            NEXT_TAG="sprint_$((NUM + 1))"
+          fi
+          echo "next_tag=$NEXT_TAG" >> $GITHUB_OUTPUT
+          echo "Next tag determined: $NEXT_TAG"
+      - name: Get latest commit SHA on prod
+        id: get_sha
+        run: |
+          echo "Fetching latest commit SHA on $TARGET_BRANCH..."
+          git fetch origin $TARGET_BRANCH --depth=1
+          COMMIT_SHA=$(git rev-parse origin/$TARGET_BRANCH)
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "Using commit: $COMMIT_SHA"
+      - name: Check if tag already exists
+        id: tag_exists
+        run: |
+          TAG=${{ steps.next_tag.outputs.next_tag }}
+          echo "Checking if tag $TAG exists..."
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag $TAG already exists. Skipping creation."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag $TAG does not exist."
+          fi
+      - name: Create and push tag (if new)
+        if: steps.tag_exists.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.VARUN_TOKEN }}
+        run: |
+          TAG=${{ steps.next_tag.outputs.next_tag }}
+          SHA=${{ steps.get_sha.outputs.commit_sha }}
+          echo "Creating annotated tag $TAG for commit $SHA..."
+          git tag -a "$TAG" "$SHA" -m "Sprint Release $TAG (commit: $SHA)"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" "refs/tags/$TAG"
+          echo "Tag $TAG pushed successfully."
+      - name: Get previous tag for comparison
+        id: previous_tag
+        run: |
+          echo "Finding previous tag for comparison..."
+          LATEST_TAG=$(git tag --list 'sprint_*' | sort -V | tail -n 2 | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD | tail -1)
+            echo "No previous sprint tag found, using initial commit: $PREVIOUS_TAG"
+          else
+            PREVIOUS_TAG="$LATEST_TAG"
+            echo "Previous tag: $PREVIOUS_TAG"
+          fi
+          echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+      - name: Fetch filtered merged PRs (exclude test/feature-* to release/*)
+        id: fetch_prs
+        env:
+          GITHUB_TOKEN: ${{ secrets.VARUN_TOKEN }}
+        run: |
+          echo "Fetching merged PRs with advanced filtering..."
+          echo "Excluding: test/feature-* → release/* merges"
+          
+          # Install GitHub CLI if not available
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "Installing GitHub CLI..."
+            sudo apt-get update -y
+            sudo apt-get install -y gh jq
+          fi
+          # Authenticate GitHub CLI
+          echo "Authenticating gh CLI..."
+          TOKEN="${GITHUB_TOKEN}"
+          unset GITHUB_TOKEN
+          echo "${TOKEN}" | gh auth login --with-token
+          CURRENT_TAG=${{ steps.next_tag.outputs.next_tag }}
+          PREVIOUS_TAG=${{ steps.previous_tag.outputs.previous_tag }}
+          
+          echo "Looking for PRs merged to: $TARGET_BRANCH"
+          echo "Excluding PRs from test/feature-* to release/*"
+          # Get PRs with advanced filtering using GitHub API directly
+          PR_LIST=$(curl -s -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API/repos/$REPO/pulls?state=closed&base=$TARGET_BRANCH&sort=updated&direction=desc&per_page=100" \
+            | jq -r ".[] | 
+                select(.merged_at != null) | 
+                select(.base.ref == \"$TARGET_BRANCH\") |
+                # Exclude PRs from test/feature-* to release/*
+                select(.head.ref | startswith(\"test/feature-\") | not) |
+                # Also exclude if base is any release branch (additional safety)
+                select(.base.ref | startswith(\"release/\") | not) |
+                \"- PR#\(.number): \(.title) (from: \(.head.ref) → to: \(.base.ref))\"")
+          # If no PRs found with direct API, try alternative approach
+          if [ -z "$PR_LIST" ]; then
+            echo "Trying alternative filtering with GitHub CLI..."
+            PR_LIST=$(gh pr list \
+              --state merged \
+              --base "$TARGET_BRANCH" \
+              --json number,title,baseRefName,headRefName \
+              --jq ".[] | 
+                select(.baseRefName == \"$TARGET_BRANCH\") |
+                # Exclude test/feature-* to any release branch
+                select(.headRefName | startswith(\"test/feature-\") | not) |
+                select(.baseRefName | startswith(\"release/\") | not) |
+                \"- PR#\(.number): \(.title) (from: \(.headRefName) → to: \(.baseRefName))\"" \
+              || echo "")
+          fi
+          # Final fallback if still no PRs
+          if [ -z "$PR_LIST" ] || [ "$PR_LIST" = "[]" ]; then
+            echo "No qualifying PRs found after filtering."
+            PR_LIST="(No significant changes in this release)"
+          fi
+          echo "Filtered Pull Requests:"
+          echo "======================"
+          echo "$PR_LIST"
+          echo "======================"
+          
+          # Save to file for release notes
+          echo "$PR_LIST" > pr_list.txt
+          
+          # Count PRs for output
+          PR_COUNT=$(echo "$PR_LIST" | grep -c "PR#" || true)
+          echo "pr_count=$PR_COUNT" >> $GITHUB_OUTPUT
+      - name: Create GitHub Release with filtered changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.VARUN2_TOKEN }}
+          TAG: ${{ steps.next_tag.outputs.next_tag }}
+          TARGET_SHA: ${{ steps.get_sha.outputs.commit_sha }}
+          TARGET_BRANCH: ${{ env.TARGET_BRANCH }}
+        run: |
+          echo "Creating release for $TAG on $TARGET_BRANCH..."
+          OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+          API_URL="$GITHUB_API/repos/$REPO/releases"
+          
+          echo "Preparing release notes with advanced filtering..."
+          RELEASE_BODY=$(printf "## What Changed \n\n### Changes Merged to %s\n\n*Excluded: test/feature-* → release/* merges*\n\n%s\n\n**Target Commit:** %s\n**Release Tag:** %s\n" \
+            "$TARGET_BRANCH" \
+            "$(cat pr_list.txt)" \
+            "$TARGET_SHA" \
+            "$TAG")
+          echo "Release Notes Content:"
+          echo "---------------------"
+          echo "$RELEASE_BODY"
+          echo "---------------------"
+          PAYLOAD=$(jq -n \
+            --arg tag "$TAG" \
+            --arg target "$TARGET_SHA" \
+            --arg name "Sprint Release $TAG" \
+            --arg body "$RELEASE_BODY" \
+            '{ tag_name: $tag, target_commitish: $target, name: $name, body: $body, draft: false, prerelease: false, generate_release_notes: true }')
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "$BODY"
+          if [ "$HTTP_CODE" -eq 201 ]; then
+            echo "Release $TAG created successfully with filtered PRs."
+          elif [ "$HTTP_CODE" -eq 422 ]; then
+            echo "Release already exists for $TAG. Skipping."
+          else
+            echo "Failed to create release (HTTP $HTTP_CODE)"
+            exit 1
+          fi
