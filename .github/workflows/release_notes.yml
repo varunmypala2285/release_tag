@@ -28,7 +28,7 @@ jobs:
         run: |
           echo "Initializing repository..."
           git init
-          git remote add origin https://${{ secrets.VARUN2_TOKEN }}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git
+          git remote add origin https://${{ secrets.VARUN_TOKEN }}@github.com/varunmypala2285/release_tag
           git fetch origin --tags --prune
           git fetch origin +refs/heads/*:refs/remotes/origin/*
           git config user.name "github-actions[bot]"
