@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - prod_test
+      - test/PROD
 
 permissions:
   contents: write
