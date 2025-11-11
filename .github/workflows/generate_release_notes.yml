@@ -70,7 +70,7 @@ jobs:
           BODY=$(jq -n \
             --arg tag "$TAG_NAME" \
             --arg target "$TARGET_COMMITISH" \
-            '{tag_name: $tag, target_commitish: $target, generate_release_notes: true, name: $tag}')
+            '{tag_name: $tag, target_commitish: $target, generate_release_notes: false, name: $tag}')
           
           curl -s -w "\n%{http_code}" -X POST "https://api.github.com/repos/${OWNER}/${REPO_NAME}/releases" \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
