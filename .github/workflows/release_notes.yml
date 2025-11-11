@@ -191,6 +191,7 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD")
+
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n -1)
           echo "HTTP Status: $HTTP_CODE"
