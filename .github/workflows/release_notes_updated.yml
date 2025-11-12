@@ -25,7 +25,7 @@ jobs:
       # 1. Clone repository
       - name: Clone repository
         env:
-          TOKEN: ${{ secrets.SUNIL3 }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
         run: |
           echo "Cloning repository..."
           git clone https://x-access-token:${TOKEN}@github.com/${{ github.repository }} .
@@ -88,7 +88,7 @@ jobs:
       # 4. Create and push new tag
       - name: Create and push new tag
         env:
-          TOKEN: ${{ secrets.SUNIL3 }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
         run: |
           TAG=${{ steps.sprint.outputs.new_tag }}
           HEAD_SHA=$(git rev-parse ${TARGET_BRANCH})
@@ -99,7 +99,7 @@ jobs:
       # 5. Create GitHub Release manually
       - name: Create GitHub Release
         env:
-          TOKEN: ${{ secrets.SUNIL3 }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
           TAG: ${{ steps.sprint.outputs.new_tag }}
           TARGET_BRANCH: ${{ env.TARGET_BRANCH }}
           REPO: ${{ github.repository }}
