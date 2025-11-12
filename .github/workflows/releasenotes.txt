@@ -1,0 +1,67 @@
+Flowchart Structure
+Start → Trigger → Condition → Steps → End
+
+1. Start
+
+Oval: Start
+
+
+2. Trigger
+
+Rectangle: Event: pull_request.closed on branch test/PROD
+
+
+3. Condition
+
+Diamond:
+
+PR merged?
+Title starts with Sprint Release:?
+Yes → Proceed
+No → End
+
+
+
+
+4. Steps
+
+
+Rectangle (Step 1): Clone repository
+
+Configure Git user
+Checkout test/PROD
+
+
+
+Rectangle (Step 2): Compute next sprint tag
+
+Find last sprint_* tag
+Increment number
+
+
+
+Rectangle (Step 3): Collect commits
+
+Filter merge commits into test/PROD
+Format release notes in commits.txt
+
+
+
+Rectangle (Step 4): Create and push new tag
+
+Tag HEAD with new_tag
+Push tag to GitHub
+
+
+
+Rectangle (Step 5): Create GitHub release
+
+Use GitHub API
+Body = formatted commits
+
+
+
+
+5. End
+
+Oval: Release created successfully
