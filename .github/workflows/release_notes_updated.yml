@@ -94,7 +94,7 @@ jobs:
           HEAD_SHA=$(git rev-parse ${TARGET_BRANCH})
           git tag -a "$TAG" "$HEAD_SHA" -m "Sprint Release $TAG"
           git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git "refs/tags/$TAG"
-          echo "✅ Tag $TAG created and pushed successfully."
+          echo "Tag $TAG created and pushed successfully."
 
       # 5. Create GitHub Release manually
       - name: Create GitHub Release
@@ -123,4 +123,4 @@ jobs:
               \"prerelease\": false
             }"
 
-          echo "🎉 Release created successfully."
+          echo "Release created successfully."
