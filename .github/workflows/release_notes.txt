@@ -1,0 +1,94 @@
+This GitHub Actions workflow automates the process of generating release notes and creating a GitHub release whenever a pull request (PR) is merged into the test/PROD branch with a title starting with Sprint Release:. Let me break it down step by step:
+
+Trigger
+YAMLon:  pull_request:    types: [closed]    branches:      - test/PRODShow more lines
+
+The workflow runs when a pull request is closed on the test/PROD branch.
+It only proceeds if the PR is merged and its title starts with Sprint Release: (checked later in if condition).
+
+
+Permissions
+YAMLpermissions:Show more lines
+
+Grants permission to write repository contents (needed for tagging and creating releases).
+
+
+Job: create_release
+YAMLif: |  github.event.pull_request.merged == true &&  startsWith(github.event.pull_request.title, 'Sprint Release:')Show more lines
+
+Ensures the job runs only if:
+
+The PR was merged.
+The PR title starts with Sprint Release:.
+
+
+
+
+Environment Variables
+YAMLenv:  TARGET_BRANCH: "test/PROD"  GITHUB_API: "https://api.github.com"  REPO: ${{ github.repository }}Show more lines
+
+Sets reusable variables for branch, API URL, and repository name.
+
+
+Steps
+1. Clone Repository
+
+Uses a personal access token (VARUN2_TOKEN) to clone the repo.
+Fetches tags and checks out test/PROD.
+Configures Git user as github-actions[bot].
+
+
+2. Compute Next Sprint Tag
+ShellLAST=$(git tag --list "sprint_*" | sort -V | tail -n1)if [ -z "$LAST" ]; then   NEXT="sprint_1"else   NUM=$(echo "$LAST" | grep -oE '[0-9]+$')   NEXT="sprint_$((NUM+1))"fiShow more lines
+
+Finds the latest tag matching sprint_*.
+If none exist, starts with sprint_1.
+Otherwise, increments the numeric part (e.g., sprint_3 → sprint_4).
+Outputs last_tag and new_tag for later steps.
+
+
+3. Collect Commits for Release Notes
+
+Determines commit range: LAST..HEAD (or just HEAD if no previous tag).
+Creates commits.txt with a header **What's Changed**.
+Loops through commits:
+
+Filters merge commits into test/PROD.
+Formats subject line to show PR number and branch.
+Adds the first line of the commit body as a bullet point.
+
+
+Example output in commits.txt:
+**What's Changed**
+
+merge pull request #123 from @feature/xyz
+  - Added new API endpoint
+
+
+
+
+4. Create and Push New Tag
+
+Tags the current test/PROD HEAD with new_tag (e.g., sprint_4).
+Pushes the tag to GitHub using the token.
+
+
+5. Create GitHub Release
+
+Reads commits.txt and escapes quotes/newlines for JSON.
+Calls GitHub API to create a release:
+
+tag_name: new sprint tag.
+name: "Sprint Release sprint_X".
+body: formatted commit list.
+
+
+Marks release as non-draft and non-prerelease.
+
+
+Purpose
+This workflow:
+
+Automates tagging for sprint releases.
+Generates release notes from merged PRs.
+Publishes a GitHub release with those notes.
