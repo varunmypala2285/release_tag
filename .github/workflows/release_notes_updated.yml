@@ -17,7 +17,7 @@ jobs:
       # 1. Checkout Repository
       - name: Clone repository
         env:
-          TOKEN: ${{ secrets.VARUN2_TOKEN }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
         run: |
           echo "Cloning repository..."
           git clone https://x-access-token:${TOKEN}@github.com/${{ github.repository }} .
@@ -82,7 +82,7 @@ jobs:
       # 4. Create and push new tag
       - name: Create and push new tag
         env:
-          TOKEN: ${{ secrets.VARUN2_TOKEN }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
         run: |
           TAG=${{ steps.sprint.outputs.new_tag }}
           TARGET_BRANCH="test/PROD"
@@ -105,7 +105,7 @@ jobs:
       # 5. Create GitHub Release manually
       - name: Create GitHub Release
         env:
-          TOKEN: ${{ secrets.VARUN2_TOKEN }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
           TAG: ${{ steps.sprint.outputs.new_tag }}
           TARGET_BRANCH: test/PROD
           REPO: ${{ github.repository }}
