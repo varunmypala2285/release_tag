@@ -31,13 +31,13 @@ jobs:
       - name: Compute next sprint tag
         id: sprint
         run: |
-          LAST="sprint_1"
-          NEXT="sprint_2"
+          LAST="sprint_4"
+          NEXT="sprint_5"
           #git fetch --tags
           #LAST=$(git tag --list "sprint_*" | sort -V | tail -n1 || true)
           #echo "$LAST"
           #if [ -z "$LAST" ]; then
-            #NEXT="sprint_2"
+            #NEXT="sprint_5"
           #else
             #NUM=$(echo "$LAST" | grep -oE '[0-9]+$')
             #NEXT="sprint_$((NUM+1))"
@@ -128,5 +128,3 @@ jobs:
               \"prerelease\": false
             }"
           echo "Release created successfully."
-
-          
