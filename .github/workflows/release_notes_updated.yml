@@ -1,4 +1,4 @@
-name: Auto Tag and Clean Release Notes (PROD)
+name: generate_release_notes_test
 
 on:
   pull_request:
@@ -6,23 +6,15 @@ on:
     branches:
       - test/PROD
 
-permissions:
-  contents: write
-
 jobs:
   create_release:
-    if: |
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.title, 'Sprint Release:')
+    permissions: # Grant minimal permissions for creating releases
+      contents: write
+    if: startsWith(github.event.pull_request.title, 'Sprint Release:')
     runs-on: ubuntu-latest
 
-    env:
-      TARGET_BRANCH: "test/PROD"
-      GITHUB_API: "https://api.github.com"
-      REPO: ${{ github.repository }}
-
     steps:
-      # 1. Clone repository
+      # 1. Checkout Repository
       - name: Clone repository
         env:
           TOKEN: ${{ secrets.VARUN_TOKEN }}
@@ -39,13 +31,17 @@ jobs:
       - name: Compute next sprint tag
         id: sprint
         run: |
-          LAST=$(git tag --list "sprint_*" | sort -V | tail -n1)
-          if [ -z "$LAST" ]; then
-             NEXT="sprint_1"
-          else
-             NUM=$(echo "$LAST" | grep -oE '[0-9]+$')
-             NEXT="sprint_$((NUM+1))"
-          fi
+          LAST="sprint_1"
+          NEXT="sprint_2"
+          #git fetch --tags
+          #LAST=$(git tag --list "sprint_*" | sort -V | tail -n1 || true)
+          #echo "$LAST"
+          #if [ -z "$LAST" ]; then
+            #NEXT="sprint_2"
+          #else
+            #NUM=$(echo "$LAST" | grep -oE '[0-9]+$')
+            #NEXT="sprint_$((NUM+1))"
+          #fi
           echo "last_tag=$LAST" >> $GITHUB_OUTPUT
           echo "new_tag=$NEXT" >> $GITHUB_OUTPUT
           echo "Last Tag: $LAST | Next Tag: $NEXT"
@@ -60,20 +56,16 @@ jobs:
           else
             RANGE="${LAST}..HEAD"
           fi
-
           echo "Collecting commits from $RANGE ..."
           echo "**What's Changed**" > commits.txt
           echo "" >> commits.txt
-
           git log $RANGE --pretty=format:"%H" | while read COMMIT; do
             SUBJECT=$(git log -1 --pretty=format:"%s" $COMMIT)
             BODY=$(git log -1 --pretty=format:"%b" $COMMIT)
-
             # Include only merges into test/PROD
             if echo "$SUBJECT" | grep -iq "merge pull request" && echo "$BODY" | grep -iq "to test/PROD"; then
               FORMATTED=$(echo "$SUBJECT" | sed -E 's|(merge pull request #[0-9]+.*from )([^/]+)/(.*)|\1@\2/\3|I')
               echo "$FORMATTED" >> commits.txt
-
               TITLE=$(echo "$BODY" | head -n 1)
               if [ -n "$TITLE" ]; then
                 echo "  - $TITLE" >> commits.txt
@@ -81,19 +73,33 @@ jobs:
               echo "" >> commits.txt
             fi
           done
-
           echo "Final commits.txt content:"
           cat commits.txt
-
+      - name: Configure Git user
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
       # 4. Create and push new tag
       - name: Create and push new tag
         env:
           TOKEN: ${{ secrets.VARUN_TOKEN }}
         run: |
           TAG=${{ steps.sprint.outputs.new_tag }}
-          HEAD_SHA=$(git rev-parse ${TARGET_BRANCH})
+          TARGET_BRANCH="test/PROD"
+          echo "Cloning repository..."
+          git clone https://x-access-token:${TOKEN}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git repo
+          cd repo
+          echo "Fetching branch ${TARGET_BRANCH}..."
+          git fetch origin "${TARGET_BRANCH}:${TARGET_BRANCH}"
+          echo "Resolving latest commit SHA for ${TARGET_BRANCH}..."
+          HEAD_SHA=$(git rev-parse "${TARGET_BRANCH}" 2>/dev/null || true)
+          if [ -z "$HEAD_SHA" ]; then
+            echo "Error: Could not resolve HEAD SHA for ${TARGET_BRANCH}"
+            exit 1
+          fi
+          echo "Creating and pushing tag ${TAG}..."
           git tag -a "$TAG" "$HEAD_SHA" -m "Sprint Release $TAG"
-          git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git "refs/tags/$TAG"
+          git push "https://x-access-token:${TOKEN}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git" "refs/tags/$TAG"
           echo "Tag $TAG created and pushed successfully."
 
       # 5. Create GitHub Release manually
@@ -101,13 +107,12 @@ jobs:
         env:
           TOKEN: ${{ secrets.VARUN_TOKEN }}
           TAG: ${{ steps.sprint.outputs.new_tag }}
-          TARGET_BRANCH: ${{ env.TARGET_BRANCH }}
+          TARGET_BRANCH: test/PROD
           REPO: ${{ github.repository }}
         run: |
           OWNER=$(echo "$REPO" | cut -d'/' -f1)
           REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
           BODY=$(cat commits.txt | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-
           echo "Creating release for tag $TAG..."
           curl -s -X POST "https://api.github.com/repos/${OWNER}/${REPO_NAME}/releases" \
             -H "Authorization: Bearer ${TOKEN}" \
@@ -122,5 +127,6 @@ jobs:
               \"draft\": false,
               \"prerelease\": false
             }"
-
           echo "Release created successfully."
+
+          
