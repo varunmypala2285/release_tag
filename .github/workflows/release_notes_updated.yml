@@ -1,4 +1,4 @@
-name: Auto Tag and Clean Release Notes (PROD)
+name: generate_release_notes_test
 
 on:
   pull_request:
@@ -6,26 +6,18 @@ on:
     branches:
       - test/PROD
 
-permissions:
-  contents: write
-
 jobs:
   create_release:
-    if: |
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.title, 'Sprint Release:')
+    permissions: # Grant minimal permissions for creating releases
+      contents: write
+    if: startsWith(github.event.pull_request.title, 'Sprint Release:')
     runs-on: ubuntu-latest
 
-    env:
-      TARGET_BRANCH: "test/PROD"
-      GITHUB_API: "https://api.github.com"
-      REPO: ${{ github.repository }}
-
     steps:
-      # 1. Clone repository
+      # 1. Checkout Repository
       - name: Clone repository
         env:
-          TOKEN: ${{ secrets.VARUN_TOKEN }}
+          TOKEN: ${{ secrets.VARUN2_TOKEN }}
         run: |
           echo "Cloning repository..."
           git clone https://x-access-token:${TOKEN}@github.com/${{ github.repository }} .
@@ -34,20 +26,25 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           echo "Repository cloned and configured."
+
       # 2. Determine next sprint tag
       - name: Compute next sprint tag
         id: sprint
         run: |
-          LAST=$(git tag --list "sprint_*" | sort -V | tail -n1)
+          
+          git fetch --tags
+          LAST=$(git tag --list "sprint_*" | sort -V | tail -n1 || true)
+          echo "$LAST"
           if [ -z "$LAST" ]; then
-             NEXT="sprint_1"
+            NEXT="sprint_2"
           else
-             NUM=$(echo "$LAST" | grep -oE '[0-9]+$')
-             NEXT="sprint_$((NUM+1))"
+            NUM=$(echo "$LAST" | grep -oE '[0-9]+$')
+            NEXT="sprint_$((NUM+1))"
           fi
           echo "last_tag=$LAST" >> $GITHUB_OUTPUT
           echo "new_tag=$NEXT" >> $GITHUB_OUTPUT
           echo "Last Tag: $LAST | Next Tag: $NEXT"
+
       # 3. Collect only valid merge commits (→ test/PROD)
       - name: Collect commits for release notes
         id: commits
@@ -77,22 +74,39 @@ jobs:
           done
           echo "Final commits.txt content:"
           cat commits.txt
+      - name: Configure Git user
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
       # 4. Create and push new tag
       - name: Create and push new tag
         env:
-          TOKEN: ${{ secrets.VARUN_TOKEN }}
+          TOKEN: ${{ secrets.VARUN2_TOKEN }}
         run: |
           TAG=${{ steps.sprint.outputs.new_tag }}
-          HEAD_SHA=$(git rev-parse ${TARGET_BRANCH})
+          TARGET_BRANCH="test/PROD"
+          echo "Cloning repository..."
+          git clone https://x-access-token:${TOKEN}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git repo
+          cd repo
+          echo "Fetching branch ${TARGET_BRANCH}..."
+          git fetch origin "${TARGET_BRANCH}:${TARGET_BRANCH}"
+          echo "Resolving latest commit SHA for ${TARGET_BRANCH}..."
+          HEAD_SHA=$(git rev-parse "${TARGET_BRANCH}" 2>/dev/null || true)
+          if [ -z "$HEAD_SHA" ]; then
+            echo "Error: Could not resolve HEAD SHA for ${TARGET_BRANCH}"
+            exit 1
+          fi
+          echo "Creating and pushing tag ${TAG}..."
           git tag -a "$TAG" "$HEAD_SHA" -m "Sprint Release $TAG"
-          git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git "refs/tags/$TAG"
+          git push "https://x-access-token:${TOKEN}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git" "refs/tags/$TAG"
           echo "Tag $TAG created and pushed successfully."
+
       # 5. Create GitHub Release manually
       - name: Create GitHub Release
         env:
-          TOKEN: ${{ secrets.VARUN_TOKEN }}
+          TOKEN: ${{ secrets.VARUN2_TOKEN }}
           TAG: ${{ steps.sprint.outputs.new_tag }}
-          TARGET_BRANCH: ${{ env.TARGET_BRANCH }}
+          TARGET_BRANCH: test/PROD
           REPO: ${{ github.repository }}
         run: |
           OWNER=$(echo "$REPO" | cut -d'/' -f1)
