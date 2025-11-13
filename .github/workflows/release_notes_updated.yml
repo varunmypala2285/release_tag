@@ -17,7 +17,7 @@ jobs:
       # 1. Checkout Repository
       - name: Clone repository
         env:
-          TOKEN: ${{ secrets.VARUN2_TOKEN }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
         run: |
           echo "Cloning repository..."
           git clone https://x-access-token:${TOKEN}@github.com/${{ github.repository }} .
@@ -81,12 +81,12 @@ jobs:
       # 4. Create and push new tag
       - name: Create and push new tag
         env:
-          TOKEN: ${{ secrets.VARUN2_TOKEN }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
         run: |
           TAG=${{ steps.sprint.outputs.new_tag }}
           TARGET_BRANCH="test/PROD"
           echo "Cloning repository..."
-          git clone https://x-access-token:${TOKEN}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git repo
+          git clone https://x-access-token:${TOKEN}@github.com/varunmypala2285/release_tag.git repo
           cd repo
           echo "Fetching branch ${TARGET_BRANCH}..."
           git fetch origin "${TARGET_BRANCH}:${TARGET_BRANCH}"
@@ -98,13 +98,13 @@ jobs:
           fi
           echo "Creating and pushing tag ${TAG}..."
           git tag -a "$TAG" "$HEAD_SHA" -m "Sprint Release $TAG"
-          git push "https://x-access-token:${TOKEN}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git" "refs/tags/$TAG"
+          git push "https://x-access-token:${TOKEN}@github.com/varunmypala2285/release_tag.git" "refs/tags/$TAG"
           echo "Tag $TAG created and pushed successfully."
 
       # 5. Create GitHub Release manually
       - name: Create GitHub Release
         env:
-          TOKEN: ${{ secrets.VARUN2_TOKEN }}
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
           TAG: ${{ steps.sprint.outputs.new_tag }}
           TARGET_BRANCH: test/PROD
           REPO: ${{ github.repository }}
