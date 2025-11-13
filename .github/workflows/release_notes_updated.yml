@@ -87,7 +87,7 @@ jobs:
           TAG=${{ steps.sprint.outputs.new_tag }}
           TARGET_BRANCH="test/PROD"
           echo "Cloning repository..."
-          git clone https://x-access-token:${TOKEN}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git repo
+          git clone https://x-access-token:${TOKEN}@github.com/varunmypala2285/release_tag.git repo
           cd repo
           echo "Fetching branch ${TARGET_BRANCH}..."
           git fetch origin "${TARGET_BRANCH}:${TARGET_BRANCH}"
@@ -99,7 +99,7 @@ jobs:
           fi
           echo "Creating and pushing tag ${TAG}..."
           git tag -a "$TAG" "$HEAD_SHA" -m "Sprint Release $TAG"
-          git push "https://x-access-token:${TOKEN}@github.com/Sanofi-GitHub/snowflake-emea_RND-DP_MRNA.git" "refs/tags/$TAG"
+          git push "https://x-access-token:${TOKEN}@github.com/varunmypala2285/release_tag.git" "refs/tags/$TAG"
           echo "Tag $TAG created and pushed successfully."
 
       # 5. Create GitHub Release manually
