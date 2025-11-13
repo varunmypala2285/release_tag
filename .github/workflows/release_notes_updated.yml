@@ -106,7 +106,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.VARUN_TOKEN }}
           TAG: ${{ steps.sprint.outputs.new_tag }}
-          TARGET_BRANCH: test/PROD
+          TARGET_BRANCH: ${{ env.TARGET_BRANCH }}
           REPO: ${{ github.repository }}
         run: |
           OWNER=$(echo "$REPO" | cut -d'/' -f1)
