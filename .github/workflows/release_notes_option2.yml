@@ -1,0 +1,110 @@
+
+name: Auto Tag and Release (test/PROD only)
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - test/PROD
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  create_release:
+    if: |
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.title, 'Sprint Release:')
+    runs-on: ubuntu-latest
+
+    env:
+      REPO: ${{ github.repository }}
+      API: "https://api.github.com"
+
+    steps:
+
+      # -------------------------------------------------------------
+      # 1. Compute next sprint_* tag
+      # -------------------------------------------------------------
+      - name: Compute Next Tag
+        id: tagfetch
+        env:
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
+        run: |
+          OWNER=$(echo "${REPO}" | cut -d'/' -f1)
+          NAME=$(echo "${REPO}" | cut -d'/' -f2)
+
+          TAGS=$(curl -s \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${API}/repos/${OWNER}/${NAME}/tags" | jq -r '.[].name')
+
+          LAST=$(echo "$TAGS" | grep '^sprint_' | sort -V | tail -n1)
+
+          if [ -z "$LAST" ]; then
+            NEXT="sprint_1"
+          else
+            NUM=$(echo "$LAST" | grep -oE '[0-9]+$')
+            NEXT="sprint_$((NUM+1))"
+          fi
+
+          echo "new_tag=$NEXT" >> $GITHUB_OUTPUT
+
+      # -------------------------------------------------------------
+      # 2. Build custom release notes (bullet format)
+      # -------------------------------------------------------------
+      - name: Build filtered merge list
+        id: releasenotes
+        env:
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
+        run: |
+          OWNER=$(echo "${REPO}" | cut -d'/' -f1)
+          NAME=$(echo "${REPO}" | cut -d'/' -f2)
+          BASE="test/PROD"
+
+          echo -e "### What's Changed\n \n<hr>" > body.md
+          echo "" >> body.md
+
+          # Fetch merged PRs where base branch is test/PROD
+          curl -s -H "Authorization: Bearer ${TOKEN}" \
+            "${API}/repos/${OWNER}/${NAME}/pulls?state=closed&base=${BASE}&per_page=100" \
+          | jq -r '
+              .[] 
+              | select(.merged_at != null)
+              | "- \(.title) by @\(.user.login) in [#\(.number)](\(.html_url))"
+            ' >> body.md
+
+          BODY=$(cat body.md)
+          BODY_ESCAPED=$(printf "%s" "$BODY" | jq -Rs .)
+          echo "body=$BODY_ESCAPED" >> $GITHUB_OUTPUT
+
+      # -------------------------------------------------------------
+      # 3. Create Release (custom body only)
+      # -------------------------------------------------------------
+      - name: Create Release
+        env:
+          TOKEN: ${{ secrets.VARUN_TOKEN }}
+          TAG: ${{ steps.tagfetch.outputs.new_tag }}
+          BODY: ${{ steps.releasenotes.outputs.body }}
+        run: |
+          OWNER=$(echo "${REPO}" | cut -d'/' -f1)
+          NAME=$(echo "${REPO}" | cut -d'/' -f2)
+          TARGET="${{ github.event.pull_request.merge_commit_sha }}"
+
+          cat <<EOF > payload.json
+          {
+            "tag_name": "${TAG}",
+            "target_commitish": "${TARGET}",
+            "name": "Sprint Release ${TAG}",
+            "draft": false,
+            "prerelease": false,
+            "generate_release_notes": false,
+            "body": ${BODY}
+          }
+          EOF
+
+          curl -s -w "\n%{http_code}" -X POST \
+            "${API}/repos/${OWNER}/${NAME}/releases" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d @payload.json
