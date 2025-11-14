@@ -1,0 +1,79 @@
+name: Auto Tag and Release Notes (PROD)
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - test/PROD
+
+permissions:
+  contents: write
+
+jobs:
+  create_release:
+    if: |
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.title, 'Sprint Release:')
+    runs-on: ubuntu-latest
+
+    env:
+      REPO: ${{ github.repository }}
+      API: "https://api.github.com"
+
+    steps:
+
+      # -------------------------------------------------------------
+      # 1. Determine the next sprint_* tag
+      # -------------------------------------------------------------
+      - name: Fetch latest sprint tag
+        id: tagfetch
+        env:
+          TOKEN: ${{ secrets.SUNIL3 }}
+        run: |
+          OWNER=$(echo "${REPO}" | cut -d'/' -f1)
+          NAME=$(echo "${REPO}" | cut -d'/' -f2)
+
+          TAGS=$(curl -s \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${API}/repos/${OWNER}/${NAME}/tags" | jq -r '.[].name')
+
+          LAST=$(echo "$TAGS" | grep '^sprint_' | sort -V | tail -n1)
+
+          if [ -z "$LAST" ]; then
+            NEXT="sprint_1"
+          else
+            NUM=$(echo "$LAST" | grep -oE '[0-9]+$')
+            NEXT="sprint_$((NUM+1))"
+          fi
+
+          echo "new_tag=$NEXT" >> $GITHUB_OUTPUT
+
+      # -------------------------------------------------------------
+      # 2. Create the Release using auto-generated release notes
+      # -------------------------------------------------------------
+      - name: Create GitHub Release
+        env:
+          TOKEN: ${{ secrets.SUNIL3 }}
+          TAG: ${{ steps.tagfetch.outputs.new_tag }}
+        run: |
+          OWNER=$(echo "${REPO}" | cut -d'/' -f1)
+          NAME=$(echo "${REPO}" | cut -d'/' -f2)
+
+          TARGET="${{ github.event.pull_request.merge_commit_sha }}"
+
+          cat <<EOF > payload.json
+          {
+            "tag_name": "${TAG}",
+            "target_commitish": "${TARGET}",
+            "name": "Sprint Release ${TAG}",
+            "draft": false,
+            "prerelease": false,
+            "generate_release_notes": true
+          }
+          EOF
+
+          curl -s -w "\n%{http_code}" -X POST \
+            "${API}/repos/${OWNER}/${NAME}/releases" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d @payload.json
