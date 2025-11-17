@@ -1,0 +1,66 @@
+name: register-keys-Keepass
+description: 'Register a key in KeePass database'
+
+inputs:
+  username:
+    description: 'Username to register the key'
+    required: true
+    type: string
+  KEEPASS_PASSWORD:
+    description: 'KeePass database password'
+    required: true
+    type: string
+  key_title:
+    description: 'Key title in KeePass database'
+    required: true
+    type: string
+  keepass_branch:
+    description: 'Branch where the KeePass database is stored'
+    required: false
+    default: 'main'
+    type: string
+  GH_TOOLBOX_TOKEN:
+    description: 'GitHub token with read and write access to the Research_Foundation-Tool_Box_Automation repository'
+    required: false
+    type: string
+outputs:
+  key_value:
+    description: 'The value of the key retrieved from KeePass database'
+    value: ${{ steps.query_key.outputs.key_value }}
+runs:
+  using: "composite"
+  
+  steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+      with:
+        repository: Sanofi-GitHub/Research_Foundation-Tool_Box_Automation
+        path: 'Research_Foundation-Tool_Box_Automation'
+        token: ${{ inputs.GH_TOOLBOX_TOKEN }}
+        ref: ${{ inputs.keepass_branch }}
+
+    - name: Install dependencies
+      run: |
+        pip install pykeepass
+        pip install python-dotenv
+      shell: bash
+
+    - name: Set up KeePass database path as environment variable
+      run: echo "KEEPASS_DB_PATH=${GITHUB_WORKSPACE}/Research_Foundation-Tool_Box_Automation/KeePassResearch.kdbx" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Query key from KeePass database
+      id: query_key
+      env:
+        KEEPASS_PASSWORD: ${{ inputs.KEEPASS_PASSWORD }}
+        USERNAME: ${{ inputs.username }}
+        KEY_TITLE: ${{ inputs.key_title }}
+      run: |
+        key_value=$(python ${GITHUB_WORKSPACE}/Research_Foundation-Tool_Box_Automation/python/query_Keepass.py)
+        echo "$key_value" | sed 's/^ */::add-mask::/'
+        { echo 'KEY_VALUE<<EOF'
+          echo "$key_value"
+          echo EOF
+        } >> "$GITHUB_OUTPUT"        
+      shell: bash
+

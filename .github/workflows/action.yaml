@@ -1,0 +1,39 @@
+name: configure-aws-connection
+description: Configure AWS connection for GitHub Actions
+inputs:
+  # IAM Role to assume
+  IAM_ROLE:
+    description: 'IAM Role to assume'
+    required: true
+  # Project name for the role session name
+  PROJECT_NAME:
+    description: 'Project name for the role session name'
+    required: true
+  aws_region:
+    description: 'AWS region'
+    required: false
+    default: 'eu-west-1'
+runs:
+  using: "composite"
+  steps:
+      # Setup the Sanofi Root CA
+      - uses: Sanofi-InnerSource/github-actions-library/setup-root-ca@main
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ inputs.IAM_ROLE }}
+          role-session-name: ${{ inputs.PROJECT_NAME }}
+          aws-region: ${{ inputs.aws_region }} 
+
+      # Install AWS CLI packages
+      - name: package installation
+        run: |
+          apt-get update
+          apt-get -y install jq
+          apt-get -y install unzip
+          apt-get -y install curl
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+          unzip awscliv2.zip
+          ./aws/install      
+        shell: bash
