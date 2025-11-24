@@ -1,0 +1,167 @@
+name: apply-snowflake-keys
+on:
+  workflow_call:
+    inputs:
+        environment:
+            description: 'Environment where the secrets will be applied'
+            required: true
+            type: string
+        snowflake_user:
+            description: 'Snowflake User to query keys for'
+            required: true
+            type: string  
+        snowflake_key_title:
+            description: 'Title of the Snowflake key in KeePass'
+            required: false
+            type: string   
+        repo_secret_name:
+            description: 'Github repo secret updated with the Snowflake key'
+            required: false
+            type: string
+        aws_path:
+            description: 'AWS Secrets Manager path to store the Snowflake key'
+            required: false
+            type: string            
+        keepass_branch:
+            description: 'KeePass Branch to use'
+            required: false
+            default: 'main'
+            type: string 
+jobs:
+    query-snowflake-keys:
+      name: Query Snowflake Keys from KeePass
+      runs-on: ubuntu-latest
+      environment: ${{ github.event.inputs.environment }}
+      outputs:
+        key: ${{ steps.mask_key.outputs.key_value }}
+      steps:
+          - name: Query from KeePass
+            id: query_keepass
+            uses: Sanofi-GitHub/Research_Foundation-Tool_Box_Automation/.github/actions/query-keys-KeePass@main
+            with:
+              username: "${{ inputs.snowflake_user }}"
+              KEEPASS_PASSWORD: "${{ secrets.KEEPASS_PASSWORD }}"
+              key_title: "${{ inputs.snowflake_key_title }}"
+              GH_TOOLBOX_TOKEN: "${{ secrets.GH_TOOLBOX_TOKEN }}"
+              keepass_branch: "${{ inputs.keepass_branch }}"
+          - name: Mask the queried key
+            id: mask_key
+            run: |
+              key_value=$(echo "${{ steps.query_keepass.outputs.key_value }}" | openssl enc -aes-256-cbc -a -pbkdf2 -salt -pass pass:"${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}")
+              { echo 'KEY_VALUE<<EOF'
+                echo "$key_value"
+                echo EOF
+              } >> "$GITHUB_OUTPUT" 
+
+    update-repo-secrets:
+        if: ${{ inputs.repo_secret_name != '' }}
+        name: 'Update repository secret with Snowflake keys'
+        runs-on: ubuntu-latest
+        permissions:
+          id-token: write
+          contents: read
+        environment: ${{ github.event.inputs.environment }}
+        needs: query-snowflake-keys
+        steps:
+            - name: Unmask encrypted Snowflake key
+              id: unmask_keys
+              run: |
+                decrypted_key=$(echo "${{ needs.query-snowflake-keys.outputs.key }}" | openssl enc -aes-256-cbc -d -a -pbkdf2 -pass pass:"${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}")
+                { echo 'secret_value<<EOF'
+                  echo "$decrypted_key"
+                  echo EOF
+                } >> "$GITHUB_OUTPUT"
+              
+            - name: setup node
+              uses: actions/setup-node@v5
+              with:
+                node-version: '24'
+    
+            - name: install node.js packages
+              run: |
+                npm install libsodium-wrappers@0.7.15
+                npm install @octokit/rest
+            
+            - name: Upload encrypted snowflake key to github environment
+              id: upload_keys
+              uses: actions/github-script@v8
+              env:
+                GITHUB_TOKEN: "${{ secrets.ENV_SECRET_WRITER }}"
+                SECRET_VALUE: ${{ steps.unmask_keys.outputs.secret_value }}
+              with:
+                script: |
+                    
+                    const sodium = require('libsodium-wrappers');
+                    const { Octokit } = require('@octokit/rest');
+        
+                    async function run() {
+                      await sodium.ready;
+
+                      const octokit = new Octokit({
+                      auth: process.env.GITHUB_TOKEN,
+                      });
+
+                      const owner = context.repo.owner;
+                      const repo = context.repo.repo;
+                      const environment = '${{ github.event.inputs.environment }}';
+                      const secretName = '${{ github.event.inputs.repo_secret_name }}';
+          
+                      try {
+                        // Step 1: Fetch public key
+                        const publicKeyResp = await octokit.rest.actions.getEnvironmentPublicKey({
+                          owner,
+                          repo,
+                          environment_name: environment
+                        });
+          
+                        const status = publicKeyResp.status;
+                        if ([400, 401, 403, 404, 422].includes(status)) {
+                          core.setFailed(`Failed to fetch environment public key. HTTP ${status}`);
+                          return;
+                        }
+          
+                        const publicKey = publicKeyResp.data.key;
+                        const keyId = publicKeyResp.data.key_id;
+          
+                        // Step 2: Encrypt secret
+                        const secretValue = process.env.SECRET_VALUE;
+                        const binKey = sodium.from_base64(publicKey, sodium.base64_variants.ORIGINAL);
+                        const binSecret = sodium.from_string(secretValue);
+                        const encBytes = sodium.crypto_box_seal(binSecret, binKey);
+                        const encryptedBase64 = sodium.to_base64(encBytes, sodium.base64_variants.ORIGINAL);
+          
+                        // Step 3: Upload encrypted secret
+                        const uploadResp = await octokit.rest.actions.createOrUpdateEnvironmentSecret({
+                          owner,
+                          repo,
+                          environment_name: environment,
+                          secret_name: secretName,
+                          encrypted_value: encryptedBase64,
+                          key_id: keyId
+                        });
+          
+                        const uploadStatus = uploadResp.status;
+                        if ([400, 401, 403, 404, 422].includes(uploadStatus)) {
+                          core.setFailed(`Failed to upload environment secret ${secretName}. HTTP ${uploadStatus}`);
+                          return;
+                        }
+          
+                        console.log(`Secret '${secretName}' uploaded successfully.`);
+          
+                      } catch (err) {
+                        core.setFailed(`Unexpected error: ${err.message}`);
+                      }
+                    }
+          
+                    run();
+    upload-aws-secrets:
+      if: ${{ inputs.aws_path != '' }}
+      needs: query-snowflake-keys
+      name: Upload Snowflake Keys to AWS Secret Manager
+      uses: Sanofi-GitHub/Research_Foundation-Tool_Box_Automation/.github/workflows/upload-snowflake-keys-AWS-reusable.yaml@main
+      with:
+        environment: "${{ github.event.inputs.environment }}"
+        aws_region: "eu-west-1"
+        key_storage_path: "${{ inputs.aws_path }}"
+        masked_key: ${{ needs.query-snowflake-keys.outputs.key }}
+      secrets: inherit 
