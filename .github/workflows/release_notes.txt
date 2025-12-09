@@ -1,0 +1,78 @@
+This GitHub Actions workflow automates tagging and release note generation whenever a pull request (PR) is merged into the test/PROD branch and its title starts with Sprint Release:. Let’s break it down step by step:
+
+Trigger
+YAMLon:  pull_request:    types: [closed]    branches:      - test/PRODShow more lines
+
+Runs only when a PR is closed on the test/PROD branch.
+Combined with the if condition later, it ensures the PR must be merged and its title starts with Sprint Release:.
+
+
+Permissions
+YAMLpermissions:  contents: write  pull-requests: readShow more lines
+
+Grants permission to write repository contents (needed for creating tags/releases).
+Allows reading PR details.
+
+
+Job: create_release
+YAMLif: |  github.event.pull_request.merged == true &&Show more lines
+
+Runs only if:
+
+The PR is merged.
+The PR title begins with Sprint Release:.
+
+
+
+
+Environment Variables
+YAMLenv:  REPO: ${{ github.repository }}  API: "https://api.github.com"Show more lines
+
+REPO holds owner/repo.
+API is GitHub’s REST API base URL.
+
+
+Steps
+
+1. Compute Next Tag
+ShellOWNER=$(echo "${REPO}" | cut -d'/' -f1)NAME=$(echo "${REPO}" | cut -d'/' -f2)TAGS=$(curl -s \  -H "Authorization: Bearer ${TOKEN}" \  "${API}/repos/${OWNER}/${NAME}/tags" | jq -r '.[].name')LAST=$(echo "$TAGS" | grep '^sprint_' | sort -V | tail -n1)if [ -z "$LAST" ]; then  NEXT="sprint_1"else  NUM=$(echo "$LAST" | grep -oE '[0-9]+$')  NEXT="sprint_$((NUM+1))"fiecho "new_tag=$NEXT" >> $GITHUB_OUTPUTShow more lines
+
+Fetches all tags from the repo.
+Filters tags starting with sprint_.
+Sorts them and picks the last one.
+If none exist → sprint_1.
+Else increments the numeric part → sprint_(N+1).
+Outputs new_tag for later steps.
+
+
+2. Build Release Notes
+Shellecho -e "### What's Changed\n \n<hr>" > body.mdecho "" >> body.mdcurl -s -H "Authorization: Bearer ${TOKEN}" \  "${API}/repos/${OWNER}/${NAME}/pulls?state=closed&base=${BASE}&per_page=100" \| jq -r '    .[]     | select(.merged_at != null)    | "- \(.title) by @\(.user.login) in [#\(.number)](\(.html_url))"  ' >> body.mdBODY=$(cat body.md)BODY_ESCAPED=$(printf "%s" "$BODY" | jq -Rs .)echo "body=$BODY_ESCAPED" >> $GITHUB_OUTPUTShow more lines
+
+Creates a markdown file body.md starting with a header.
+Fetches closed PRs with base test/PROD.
+Filters merged PRs.
+Formats each as:
+- PR Title by @username in PR_URL
+
+
+Escapes the body for JSON and outputs it.
+
+
+3. Create Release
+Shellcat <<EOF > payload.json{  "tag_name": "${TAG}",  "target_commitish": "${TARGET}",  "name": "Sprint Release ${TAG}",  "draft": false,  "prerelease": false,  "generate_release_notes": false,  "body": ${BODY}}EOFcurl -s -w "\n%{http_code}" -X POST \  "${API}/repos/${OWNER}/${NAME}/releases" \  -H "Authorization: Bearer ${TOKEN}" \  -H "Content-Type: application/json" \  -d @payload.jsonShow more lines
+
+Builds a JSON payload for the release:
+
+tag_name: computed sprint tag.
+target_commitish: merge commit SHA of the PR.
+name: human-readable release name.
+body: custom release notes from previous step.
+
+
+Sends POST request to GitHub API to create the release.
+
+
+Key Features
+✅ Automatically increments sprint tags (sprint_1, sprint_2, …).
+✅ Generates custom release notes listing merged PRs.
+✅ Creates a GitHub release with the new tag and notes.

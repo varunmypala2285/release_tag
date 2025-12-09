@@ -1,0 +1,63 @@
+name: register KeyPass
+
+on:
+    workflow_call:
+        inputs:
+            username:
+                description: 'Username to register the key'
+                required: true
+                type: string
+            key_value:
+                description: 'Key value to update'
+                required: true
+                type: string
+            key_title:
+                description: 'Key title in KeePass database'
+                required: true
+                type: string
+            key_path:
+                description: 'Key path in KeePass database'
+                required: true
+                type: string
+            notes:
+                description: 'Notes to add to the key entry'
+                required: false
+                type: string
+            keepass_branch:
+                description: 'Branch where the KeePass database is stored'
+                required: true
+                type: string       
+jobs:
+    register-KeyPass-reusable:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Install root certificate authority
+              uses: Sanofi-InnerSource/github-actions-library/setup-root-ca@main
+
+            - name: Unmask key by passphrase-based decryption 
+              id: unmask-key
+              run: |
+                masked_key="${{ inputs.key_value }}"
+
+                SNOWFLAKE_KEY=$(echo "$masked_key" | openssl enc -d -aes-256-cbc -a -pbkdf2 -salt -pass pass:"${{ secrets.TOOLBOX_PASSPHRASE }}")
+
+                echo "Unmasking key from inputs is done."
+      
+                echo "$SNOWFLAKE_KEY" | sed 's/^ */::add-mask::/'
+      
+                { echo 'SNOWFLAKE_KEY<<EOF'
+                  echo "$SNOWFLAKE_KEY"
+                  echo EOF
+                } >> $GITHUB_OUTPUT  
+
+            - name: Sign up keys in KeePass
+              uses: Sanofi-GitHub/Research_Foundation-Tool_Box_Automation/.github/actions/register-keys-KeePass@main
+              with:
+                username: ${{ inputs.username }}
+                key_value: ${{ steps.unmask-key.outputs.SNOWFLAKE_KEY }}
+                KEEPASS_PASSWORD: ${{ secrets.KEEPASS_PASSWORD }}
+                key_title: ${{ inputs.key_title }}
+                key_path: ${{ inputs.key_path }}
+                notes: ${{ inputs.notes }}
+                keepass_branch: ${{ inputs.keepass_branch }}
+                GH_TOOLBOX_TOKEN: ${{ secrets.GH_TOOLBOX_TOKEN }}
