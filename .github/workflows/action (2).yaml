@@ -1,0 +1,36 @@
+name: "update-aws-secretsmanager"
+description: "Update or create a secret in AWS Secrets Manager"
+inputs:
+    secret_id:
+        description: 'ID of the secret to store'
+        required: true
+        type: string
+    secret_string:
+        description: 'String value of the secret to store'
+        required: true
+        type: string
+    aws_region:
+        description: 'AWS region where the secret is stored'
+        required: true
+        type: string
+runs:
+  using: "composite"
+  steps:
+      - name: Update secret in AWS Secrets Manager
+        run: |
+            set +e
+            aws secretsmanager describe-secret --secret-id ${{ inputs.secret_id }} --region ${{ inputs.aws_region }} 2>/dev/null
+            describe_secret_code=$?
+            set -e
+            if [ $describe_secret_code -eq 0 ]; then
+                aws secretsmanager put-secret-value \
+                    --secret-id ${{ inputs.secret_id }} \
+                    --secret-string ${{ inputs.secret_string }} \
+                    --region ${{ inputs.aws_region }}
+            else
+                aws secretsmanager create-secret \
+                    --name ${{ inputs.secret_id }} \
+                    --secret-string ${{ inputs.secret_string }} \
+                    --region ${{ inputs.aws_region }}
+            fi     
+        shell: bash            
