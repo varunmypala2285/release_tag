@@ -1,0 +1,198 @@
+
+Profile
+7,5 years of work experience in IT products & services industry. Expertise in leading strategic initiatives & managing large-scale executions in - Cloud migration AWS. Obtain a challenging position of System Admin to make use of my creative abilities, analytical skills, and my strong knowledge of current and advanced technologies. Extensive experience and dedicated member in IT Industry for over 1 year as Linux System Administrator, 5 years as AWS & DevOps Engineer.
+
+	Job
+AWS DevOps Engineer
+
+
+Education
+MBA
+
+
+
+
+
+
+ 
+Professional experience in Capgemini
+
+Project: Sanofi – (Jul - 25 to Dec – 25)
+
+GitHub Automation & Release Management
+
+Roles and Responsibilities:
+
+•	Designed and built GitHub Actions workflows to automate sprint feature tracking, PR creation, approval routing, and final sprint release preparation.
+
+•	Implemented automated release tag generation using GitHub Actions, reducing manual effort and improving release consistency.
+
+•	Defined and enforced branching strategies to streamline development, integration, and production deployment workflows.
+
+•	Coordinated with developers to collect feature branch updates, validate changes, and merge code into the release branch.
+
+•	Managed release branch promotion to PROD, ensuring smooth and error-free deployment cycles.
+
+•	Automated generation of sprint-wise release notes by extracting merged features and PR metadata.
+
+•	Deployed Snowflake code across DEV, QA, UAT, and PROD environments using controlled CI/CD pipelines and approval workflows.
+
+
+Project: Hartford – (Feb - 25 to June – 25)
+
+GitHub Enterprise to Git Cloud Migration
+
+Roles and Responsibilities:
+
+
+Planning and Strategy:
+
+•	Develop a comprehensive migration plan, including timelines, milestones, and risk assessments.
+
+•	Identify and document all repositories, users, and access controls in the current GitHub Enterprise environment.
+
+•	Define the target state in Git Cloud, including repository structure, access controls, and integration points.
+
+Migration Execution:
+
+•	Execute the migration of repositories from GitHub Enterprise to Git Cloud, ensuring minimal downtime and data integrity.
+
+•	Use migration tools and scripts to automate the transfer of repositories, issues, pull requests, and other metadata.
+
+•	Validate the successful migration of each repository and its associated data.
+
+
+Coordination and Communication:
+
+•	Coordinate with development teams to ensure a smooth transition and address any concerns or issues.
+
+•	Communicate the migration plan, progress, and any changes to all stakeholders.
+
+•	Provide regular updates and reports on the migration status.
+
+Best Practices Implementation:
+
+•	Implement best practices for repository management, including naming conventions, branching strategies, and access controls.
+
+•	Ensure compliance with security and governance policies in the new Git Cloud environment.
+
+•	Set up and configure necessary integrations with CI/CD pipelines, issue tracking systems, and other tools.
+
+Post-Migration Activities:
+
+•	Monitor the new Git Cloud environment for any issues or performance concerns.
+
+•	Gather feedback from users and stakeholders to identify areas for improvement.
+
+
+Professional experience prior to Capgemini
+
+•	Worked with Omnicom media group from April 2024 to August 2024.
+
+•	Worked with Tech Mahindra from February 2021 to November 2023.
+
+•	Worked with Affluent global services (FIRSTMERIDIAN GLOBAL SERVICES PRIVATE LIMITED) from July 2019 to September 2019.
+
+•	Worked with Accenture Solutions Pvt Ltd from October 2017 to January 2019.
+
+•	Worked with Virtusa consulting services from September 2012 to August 2014.
+
+
+Senior Analyst | Omnicom Media Group 
+April - 2024 to August 2024
+
+•	Manage access to the AWS account using IAM services by creating groups, policies, roles and by assigning the users to respective groups.
+ 
+•	By Using Database Migration Service, migrate the data from once database to another databases.
+
+•	Create AWS resources like., VPC, Subnet, Route Tables, Security Groups, DMS Instance, DMS tasks and end points, RDS, S3 bucket.
+
+•	Created snapshots to take backups of the volumes and also images to store launch configurations of the EC2 instances.
+
+•	Version control and source code management using GIT.
+
+•	Extensive experience using MAVEN as build tools for the building of deployable artifacts (jar, war & ear) from source code.
+
+•	Implemented the Continuous Integration server (Jenkins) for automate the build process for Maven projects.
+
+•	Analyze logs and metrics to identify and resolve issues quickly.
+
+•	Collaborating with teams to identify, analyze, and resolve system issues.
+
+•	Implement security practices and policies in the CI/CD pipeline. Ensure compliance with security standards and policies.
+
+•	Used AWS Secret Manager service to safely store sensitive information like., RDS, Redis, Argo, API Passwords.
+
+•	Used KMS (Key Management Service) to protect the data in AWS.
+
+•	Maintained the monitoring and alerting of production and corporate servers using Cloud Watch service.
+
+
+Senior Engineer | Tech Mahindra
+February 2021 to November 2023
+
+•	Creating and launching EC2 instances using AMI’s of Linux, Ubuntu and Windows.
+
+•	Set up and attached EBS volumes to EC2 Instances and setup, configured EIP to EC2 instances.
+
+•	Created snapshots to take backups of the volumes and also images to store launch configurations of the EC2 instances.
+
+•	Created and configured elastic load balancers and auto scaling groups to distribute the traffic and to have a cost efficient, fault tolerant and highly available environment.
+
+•	Experienced in creating multiple VPC’s and public, private subnets as per requirement and distributed them as groups into various availability zones of the VPC.
+
+•	Installation and configuration of GIT and make it ready for deployment.
+
+•	Develop and maintained Ci/CD methodologies to speed the development process through automation.
+
+•	Developed processes to monitor systems and performed data collection while adhering to maintenance regulations.
+
+•	Maintain automated CI/CD pipelines for code deployment.
+
+•	Designing and implementing build, deployment, and configuration management.
+
+•	Configured serverless architecture solutions utilizing AWS Lambda functions for improved cost savings.
+
+•	Collaborated with stakeholders across multiple teams to successfully implement feature requests while adhering to strict deadlines.
+
+•	Developed and maintained a CI/CD pipeline using Jenkins, Git, Maven, and Ansible.
+
+
+Certificates
+
+•	AWS Solutions Architect
+
+
+
+
+
+
+
+
+
+
+
+
+Additional skills
+
+Operating System	:           Windows, Amazon Linux, Ubuntu/RHEL
+Cloud Technologies:           AWS (VPC, EC2, Security Groups, IAM, 
+                                                   RDS, DMS, S3, VPC Peering, Redis, NAT Gateway, 
+                                                   Internet Gateway, Route 53, CloudFront, Load Balancer, 
+                                                   EKS, EBS)
+DevOps Tools    	:           Ansible, Docker, Terraform, Kubernetes
+CI/CD		:           Jenkins, GitLab
+Monitoring Tools	:           Grafana, Cloud Watch
+SCM		:           GitHub, GitLab
+Registry		:           Docker Hub
+Ticketing Tool	:           Jira, Service-Now
+Web Servers	:           Apache, OHS, Nginx
+Web Technology	:           HTML, XML
+Scripting Languages:         Unix Shell Scripting.
+
+
+
+
+
+
+
